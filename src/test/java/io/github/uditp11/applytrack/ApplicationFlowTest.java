@@ -61,6 +61,11 @@ class ApplicationFlowTest {
         assertThat(history.get(0).get("from").isNull()).isTrue();
         assertThat(history.get(0).get("to").asText()).isEqualTo("DRAFT");
         assertThat(history.get(2).get("to").asText()).isEqualTo("INTERVIEW");
+
+        JsonNode stats = http.getForObject("/api/stats", JsonNode.class);
+        assertThat(stats.get("byStatus")).hasSize(6);
+        assertThat(stats.get("byStatus").get("INTERVIEW").asLong()).isPositive();
+        assertThat(stats.get("responded").asLong()).isPositive();
     }
 
     @Test
