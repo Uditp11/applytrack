@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import io.github.uditp11.applytrack.TestcontainersConfiguration;
@@ -110,5 +111,21 @@ class RepositoryConstraintsTest {
 
         assertThat(transitions.findByApplicationIdOrderByOccurredAtAscIdAsc(application.getId())).isEmpty();
         assertThat(followUps.findByApplicationId(application.getId())).isEmpty();
+    }
+
+    @Test
+    void savingAStaleCopyOfAnApplicationFailsInsteadOfOverwriting() {
+        long id = applications.save(new Application(newPosting(), null, NOW)).getId();
+        startFreshLikeANewRequest();
+        Application firstReader = applications.findById(id).orElseThrow();
+        entityManager.detach(firstReader);
+
+        Application secondReader = applications.findById(id).orElseThrow();
+        secondReader.changeStatus(ApplicationStatus.APPLIED, NOW);
+        startFreshLikeANewRequest();
+
+        firstReader.changeStatus(ApplicationStatus.WITHDRAWN, NOW);
+        assertThatThrownBy(() -> applications.saveAndFlush(firstReader))
+                .isInstanceOf(OptimisticLockingFailureException.class);
     }
 }

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -87,5 +88,15 @@ class ApplicationControllerTest {
         mvc.perform(post(TRANSITIONS).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"APPLIED\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Application 7 not found"));
+    }
+
+    @Test
+    void aChangeMadeAtTheSameTimeIsA409Problem() throws Exception {
+        when(service.moveTo(7, ApplicationStatus.APPLIED))
+                .thenThrow(new ObjectOptimisticLockingFailureException("Application", 7L));
+
+        mvc.perform(post(TRANSITIONS).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"APPLIED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Conflict"));
     }
 }
