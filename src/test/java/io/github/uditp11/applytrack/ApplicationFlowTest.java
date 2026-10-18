@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -21,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 /** The whole stack: real HTTP, real Spring, real PostgreSQL with the Flyway schema. */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
+@AutoConfigureObservability // Spring Boot tests switch metrics export off unless asked
 @Testcontainers(disabledWithoutDocker = true)
 class ApplicationFlowTest {
 
@@ -66,6 +68,10 @@ class ApplicationFlowTest {
         assertThat(stats.get("byStatus")).hasSize(6);
         assertThat(stats.get("byStatus").get("INTERVIEW").asLong()).isPositive();
         assertThat(stats.get("responded").asLong()).isPositive();
+
+        String metrics = http.getForObject("/actuator/prometheus", String.class);
+        assertThat(metrics).containsPattern(
+                "applytrack_status_transitions_total\\{[^}]*from=\"APPLIED\"[^}]*to=\"INTERVIEW\"[^}]*\\} [1-9]");
     }
 
     @Test

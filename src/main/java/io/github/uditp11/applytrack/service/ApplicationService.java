@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.domain.Sort;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,13 +29,15 @@ public class ApplicationService {
     private final ApplicationRepository applications;
     private final PostingRepository postings;
     private final StatusTransitionRepository transitions;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public ApplicationService(ApplicationRepository applications, PostingRepository postings,
-            StatusTransitionRepository transitions, Clock clock) {
+            StatusTransitionRepository transitions, ApplicationEventPublisher events, Clock clock) {
         this.applications = applications;
         this.postings = postings;
         this.transitions = transitions;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -80,6 +83,7 @@ public class ApplicationService {
         Instant now = clock.instant();
         application.changeStatus(target, now);
         transitions.save(new StatusTransition(application, from, target, now));
+        events.publishEvent(new StatusChanged(id, from, target));
         return ApplicationResponse.from(application);
     }
 

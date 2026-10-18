@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import io.github.uditp11.applytrack.domain.Application;
 import io.github.uditp11.applytrack.domain.ApplicationStatus;
@@ -45,11 +46,15 @@ class ApplicationServiceTest {
     @Mock
     private StatusTransitionRepository transitions;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private ApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApplicationService(applications, postings, transitions, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new ApplicationService(applications, postings, transitions, events,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static Posting posting() {
@@ -74,6 +79,7 @@ class ApplicationServiceTest {
         assertThat(moved.updatedAt()).isEqualTo(NOW);
         ArgumentCaptor<StatusTransition> saved = ArgumentCaptor.forClass(StatusTransition.class);
         verify(transitions).save(saved.capture());
+        verify(events).publishEvent(new StatusChanged(7, ApplicationStatus.APPLIED, ApplicationStatus.INTERVIEW));
         assertThat(saved.getValue().getFromStatus()).isEqualTo(ApplicationStatus.APPLIED);
         assertThat(saved.getValue().getToStatus()).isEqualTo(ApplicationStatus.INTERVIEW);
         assertThat(saved.getValue().getOccurredAt()).isEqualTo(NOW);
@@ -88,7 +94,7 @@ class ApplicationServiceTest {
                 .isInstanceOf(IllegalTransitionException.class)
                 .hasMessage("Cannot move application 7 from OFFER to APPLIED");
         assertThat(application.getStatus()).isEqualTo(ApplicationStatus.OFFER);
-        verifyNoInteractions(transitions);
+        verifyNoInteractions(transitions, events);
     }
 
     @Test
