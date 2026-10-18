@@ -11,9 +11,6 @@ spring:
       # Flyway owns the schema. Hibernate only checks that the entities match it.
       ddl-auto: validate
     open-in-view: false
-  mvc:
-    problemdetails:
-      enabled: true
 
 management:
   endpoint:
