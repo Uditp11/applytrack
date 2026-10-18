@@ -23,9 +23,16 @@ jobs:
       - name: Build Docker image
         run: docker build -t applytrack:ci .
 
-      - name: Run the image and check health
+      - name: Run the image with PostgreSQL and check health
         run: |
-          docker run -d --name applytrack -p 8080:8080 applytrack:ci
+          docker network create applytrack
+          docker run -d --name db --network applytrack \
+            -e POSTGRES_DB=applytrack -e POSTGRES_USER=applytrack -e POSTGRES_PASSWORD=applytrack \
+            postgres:17-alpine
+          until docker exec db pg_isready -U applytrack -d applytrack; do sleep 1; done
+          docker run -d --name applytrack --network applytrack -p 8080:8080 \
+            -e DB_URL=jdbc:postgresql://db:5432/applytrack \
+            applytrack:ci
           for i in $(seq 1 30); do
             if curl -fs http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
               echo "Health is UP"
