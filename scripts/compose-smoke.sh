@@ -7,6 +7,7 @@ set -euo pipefail
 APP_URL=${APP_URL:-http://localhost:8080}
 PROMETHEUS_URL=${PROMETHEUS_URL:-http://localhost:9090}
 GRAFANA_URL=${GRAFANA_URL:-http://localhost:3000}
+GRAFANA_AUTH="admin:${GRAFANA_ADMIN_PASSWORD:-admin}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -41,10 +42,10 @@ wait_for "Prometheus has scraped applytrack_status_transitions_total" 90 sh -c \
   "curl -fsS '$PROMETHEUS_URL/api/v1/query?query=applytrack_status_transitions_total' | grep -q '\"to\":\"INTERVIEW\"'"
 
 wait_for "Grafana is up" 60 curl -fsS "$GRAFANA_URL/api/health"
-curl -fsS "$GRAFANA_URL/api/datasources/uid/prometheus" | grep -q '"type":"prometheus"' \
+curl -fsS -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/datasources/uid/prometheus" | grep -q '"type":"prometheus"' \
   || fail "Grafana has no provisioned Prometheus datasource"
 echo "ok: Grafana datasource provisioned"
-curl -fsS "$GRAFANA_URL/api/dashboards/uid/applytrack" | grep -q '"title":"ApplyTrack"' \
+curl -fsS -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/dashboards/uid/applytrack" | grep -q '"title":"ApplyTrack"' \
   || fail "Grafana has no provisioned ApplyTrack dashboard"
 echo "ok: Grafana dashboard provisioned"
 
