@@ -2,6 +2,7 @@ package io.github.uditp11.applytrack.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +27,9 @@ public class ContactService {
 
     @Transactional(readOnly = true)
     public List<ContactResponse> list(Long companyId) {
-        List<Contact> found = companyId == null ? contacts.findAll() : contacts.findByCompanyId(companyId);
+        List<Contact> found = companyId == null
+                ? contacts.findAll(Sort.by("id"))
+                : contacts.findByCompanyIdOrderById(companyId);
         return found.stream().map(ContactResponse::from).toList();
     }
 

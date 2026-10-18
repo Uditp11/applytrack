@@ -8,5 +8,5 @@ import io.github.uditp11.applytrack.domain.Contact;
 
 public interface ContactRepository extends JpaRepository<Contact, Long> {
 
-    List<Contact> findByCompanyId(long companyId);
+    List<Contact> findByCompanyIdOrderById(long companyId);
 }

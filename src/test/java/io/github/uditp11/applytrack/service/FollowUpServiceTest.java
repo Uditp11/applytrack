@@ -24,6 +24,7 @@ import io.github.uditp11.applytrack.domain.FollowUp;
 import io.github.uditp11.applytrack.domain.Posting;
 import io.github.uditp11.applytrack.dto.FollowUpRequest;
 import io.github.uditp11.applytrack.dto.FollowUpResponse;
+import io.github.uditp11.applytrack.dto.FollowUpUpdateRequest;
 import io.github.uditp11.applytrack.repository.ApplicationRepository;
 import io.github.uditp11.applytrack.repository.FollowUpRepository;
 
@@ -74,10 +75,25 @@ class FollowUpServiceTest {
         FollowUp open = new FollowUp(application(), DUE, "Email the recruiter");
         FollowUp finished = new FollowUp(application(), DUE, "Send references");
         finished.setDone(true);
-        when(followUps.findByApplicationId(2L)).thenReturn(List.of(open, finished));
+        when(followUps.findByApplicationIdOrderByDueDateAscIdAsc(2L)).thenReturn(List.of(open, finished));
 
         List<FollowUpResponse> result = service.list(2L, false);
 
         assertThat(result).extracting(FollowUpResponse::note).containsExactly("Email the recruiter");
+    }
+
+    @Test
+    void updateChangesDateNoteAndDoneButNeverTheApplication() {
+        Application application = application();
+        FollowUp followUp = new FollowUp(application, DUE, "Email the recruiter");
+        when(followUps.findById(5L)).thenReturn(Optional.of(followUp));
+
+        FollowUpResponse updated = service.update(5,
+                new FollowUpUpdateRequest(LocalDate.of(2026, 10, 30), "Call the recruiter", true));
+
+        assertThat(updated.dueDate()).isEqualTo(LocalDate.of(2026, 10, 30));
+        assertThat(updated.note()).isEqualTo("Call the recruiter");
+        assertThat(updated.done()).isTrue();
+        assertThat(followUp.getApplication()).isSameAs(application);
     }
 }

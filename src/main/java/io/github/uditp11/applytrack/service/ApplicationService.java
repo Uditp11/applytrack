@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,9 @@ public class ApplicationService {
 
     @Transactional(readOnly = true)
     public List<ApplicationResponse> list(ApplicationStatus status) {
-        List<Application> found = status == null ? applications.findAll() : applications.findByStatus(status);
+        List<Application> found = status == null
+                ? applications.findAll(Sort.by("id"))
+                : applications.findByStatusOrderById(status);
         return found.stream().map(ApplicationResponse::from).toList();
     }
 

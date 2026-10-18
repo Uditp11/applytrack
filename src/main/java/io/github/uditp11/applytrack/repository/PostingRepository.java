@@ -8,5 +8,5 @@ import io.github.uditp11.applytrack.domain.Posting;
 
 public interface PostingRepository extends JpaRepository<Posting, Long> {
 
-    List<Posting> findByCompanyId(long companyId);
+    List<Posting> findByCompanyIdOrderById(long companyId);
 }

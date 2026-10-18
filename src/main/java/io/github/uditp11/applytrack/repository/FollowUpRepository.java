@@ -8,5 +8,5 @@ import io.github.uditp11.applytrack.domain.FollowUp;
 
 public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
 
-    List<FollowUp> findByApplicationId(long applicationId);
+    List<FollowUp> findByApplicationIdOrderByDueDateAscIdAsc(long applicationId);
 }

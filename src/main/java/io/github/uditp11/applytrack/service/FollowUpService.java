@@ -2,6 +2,7 @@ package io.github.uditp11.applytrack.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,6 +10,7 @@ import io.github.uditp11.applytrack.domain.Application;
 import io.github.uditp11.applytrack.domain.FollowUp;
 import io.github.uditp11.applytrack.dto.FollowUpRequest;
 import io.github.uditp11.applytrack.dto.FollowUpResponse;
+import io.github.uditp11.applytrack.dto.FollowUpUpdateRequest;
 import io.github.uditp11.applytrack.repository.ApplicationRepository;
 import io.github.uditp11.applytrack.repository.FollowUpRepository;
 
@@ -27,7 +29,9 @@ public class FollowUpService {
     /** Both filters are optional. The done filter runs in memory: one person's follow-ups are a short list. */
     @Transactional(readOnly = true)
     public List<FollowUpResponse> list(Long applicationId, Boolean done) {
-        List<FollowUp> found = applicationId == null ? followUps.findAll() : followUps.findByApplicationId(applicationId);
+        List<FollowUp> found = applicationId == null
+                ? followUps.findAll(Sort.by("dueDate", "id"))
+                : followUps.findByApplicationIdOrderByDueDateAscIdAsc(applicationId);
         return found.stream()
                 .filter(followUp -> done == null || followUp.isDone() == done)
                 .map(FollowUpResponse::from)
@@ -45,8 +49,7 @@ public class FollowUpService {
         return FollowUpResponse.from(followUps.save(followUp));
     }
 
-    /** The application a follow-up belongs to never changes; only date, note and done can be edited. */
-    public FollowUpResponse update(long id, FollowUpRequest request) {
+    public FollowUpResponse update(long id, FollowUpUpdateRequest request) {
         FollowUp followUp = find(id);
         followUp.setDueDate(request.dueDate());
         followUp.setNote(request.note());

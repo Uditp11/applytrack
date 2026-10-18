@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.github.uditp11.applytrack.dto.FollowUpRequest;
 import io.github.uditp11.applytrack.dto.FollowUpResponse;
+import io.github.uditp11.applytrack.dto.FollowUpUpdateRequest;
 import io.github.uditp11.applytrack.service.FollowUpService;
 import jakarta.validation.Valid;
 
@@ -46,7 +47,7 @@ public class FollowUpController {
     }
 
     @PutMapping("/{id}")
-    public FollowUpResponse update(@PathVariable long id, @Valid @RequestBody FollowUpRequest request) {
+    public FollowUpResponse update(@PathVariable long id, @Valid @RequestBody FollowUpUpdateRequest request) {
         return service.update(id, request);
     }
 

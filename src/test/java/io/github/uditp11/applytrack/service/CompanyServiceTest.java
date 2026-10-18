@@ -49,7 +49,8 @@ class CompanyServiceTest {
     void createSavesTheCompanyWithTheCurrentTime() {
         when(companies.save(any(Company.class))).thenAnswer(call -> call.getArgument(0));
 
-        CompanyResponse created = service.create(new CompanyRequest("Northwind Analytics", "https://northwind.example.com"));
+        CompanyResponse created = service.create(
+                new CompanyRequest("Northwind Analytics", "https://northwind.example.com"));
 
         assertThat(created.name()).isEqualTo("Northwind Analytics");
         assertThat(created.website()).isEqualTo("https://northwind.example.com");
@@ -61,7 +62,8 @@ class CompanyServiceTest {
         Company existing = new Company("Northwind", null, NOW);
         when(companies.findById(3L)).thenReturn(Optional.of(existing));
 
-        CompanyResponse updated = service.update(3, new CompanyRequest("Northwind Analytics", "https://northwind.example.com"));
+        CompanyResponse updated = service.update(3,
+                new CompanyRequest("Northwind Analytics", "https://northwind.example.com"));
 
         assertThat(updated.name()).isEqualTo("Northwind Analytics");
         assertThat(existing.getWebsite()).isEqualTo("https://northwind.example.com");

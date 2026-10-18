@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 
 import io.github.uditp11.applytrack.domain.Company;
 import io.github.uditp11.applytrack.domain.Contact;
@@ -49,12 +50,12 @@ class ContactServiceTest {
     @Test
     void listWithACompanyIdReturnsOnlyThatCompanysContacts() {
         Company company = new Company("Contoso Freight", null, Instant.parse("2026-10-18T09:00:00Z"));
-        when(contacts.findByCompanyId(4L)).thenReturn(
+        when(contacts.findByCompanyIdOrderById(4L)).thenReturn(
                 List.of(new Contact(company, "Jonas Weber", "jonas.weber@example.com", "Hiring manager")));
 
         List<ContactResponse> result = service.list(4L);
 
         assertThat(result).extracting(ContactResponse::name).containsExactly("Jonas Weber");
-        verify(contacts, never()).findAll();
+        verify(contacts, never()).findAll(any(Sort.class));
     }
 }

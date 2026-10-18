@@ -9,5 +9,5 @@ import io.github.uditp11.applytrack.domain.ApplicationStatus;
 
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
 
-    List<Application> findByStatus(ApplicationStatus status);
+    List<Application> findByStatusOrderById(ApplicationStatus status);
 }

@@ -3,6 +3,7 @@ package io.github.uditp11.applytrack.service;
 import java.time.Clock;
 import java.util.List;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +30,9 @@ public class PostingService {
 
     @Transactional(readOnly = true)
     public List<PostingResponse> list(Long companyId) {
-        List<Posting> found = companyId == null ? postings.findAll() : postings.findByCompanyId(companyId);
+        List<Posting> found = companyId == null
+                ? postings.findAll(Sort.by("id"))
+                : postings.findByCompanyIdOrderById(companyId);
         return found.stream().map(PostingResponse::from).toList();
     }
 

@@ -62,13 +62,13 @@ class RepositoryConstraintsTest {
         contacts.save(new Contact(posting.getCompany(), "Mira Okafor", "mira.okafor@example.com", "Recruiter"));
         applications.flush();
 
-        assertThat(applications.findByStatus(ApplicationStatus.DRAFT)).extracting(Application::getId)
+        assertThat(applications.findByStatusOrderById(ApplicationStatus.DRAFT)).extracting(Application::getId)
                 .contains(application.getId());
-        assertThat(postings.findByCompanyId(posting.getCompany().getId())).hasSize(1);
-        assertThat(contacts.findByCompanyId(posting.getCompany().getId())).hasSize(1);
+        assertThat(postings.findByCompanyIdOrderById(posting.getCompany().getId())).hasSize(1);
+        assertThat(contacts.findByCompanyIdOrderById(posting.getCompany().getId())).hasSize(1);
         assertThat(transitions.findByApplicationIdOrderByOccurredAtAscIdAsc(application.getId()))
                 .extracting(StatusTransition::getToStatus).containsExactly(ApplicationStatus.DRAFT);
-        assertThat(followUps.findByApplicationId(application.getId())).hasSize(1);
+        assertThat(followUps.findByApplicationIdOrderByDueDateAscIdAsc(application.getId())).hasSize(1);
     }
 
     @Test
@@ -100,6 +100,30 @@ class RepositoryConstraintsTest {
     }
 
     @Test
+    void aCompanyWithOnlyAContactCannotBeDeleted() {
+        Company company = companies.save(new Company("Wide World Importers", null, NOW));
+        contacts.save(new Contact(company, "Lena Brandt", "lena.brandt@example.com", "Recruiter"));
+        startFreshLikeANewRequest();
+
+        assertThatThrownBy(() -> {
+            companies.deleteById(company.getId());
+            companies.flush();
+        }).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void aPostingWithAnApplicationCannotBeDeleted() {
+        Posting posting = newPosting();
+        applications.save(new Application(posting, null, NOW));
+        startFreshLikeANewRequest();
+
+        assertThatThrownBy(() -> {
+            postings.deleteById(posting.getId());
+            postings.flush();
+        }).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void deletingAnApplicationRemovesItsTransitionsAndFollowUps() {
         Application application = applications.save(new Application(newPosting(), null, NOW));
         transitions.save(new StatusTransition(application, null, ApplicationStatus.DRAFT, NOW));
@@ -110,7 +134,7 @@ class RepositoryConstraintsTest {
         applications.flush();
 
         assertThat(transitions.findByApplicationIdOrderByOccurredAtAscIdAsc(application.getId())).isEmpty();
-        assertThat(followUps.findByApplicationId(application.getId())).isEmpty();
+        assertThat(followUps.findByApplicationIdOrderByDueDateAscIdAsc(application.getId())).isEmpty();
     }
 
     @Test
