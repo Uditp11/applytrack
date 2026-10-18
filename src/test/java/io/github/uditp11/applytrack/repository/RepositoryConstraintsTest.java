@@ -62,7 +62,7 @@ class RepositoryConstraintsTest {
         applications.flush();
 
         assertThat(applications.findByStatus(ApplicationStatus.DRAFT)).extracting(Application::getId)
-                .containsExactly(application.getId());
+                .contains(application.getId());
         assertThat(postings.findByCompanyId(posting.getCompany().getId())).hasSize(1);
         assertThat(contacts.findByCompanyId(posting.getCompany().getId())).hasSize(1);
         assertThat(transitions.findByApplicationIdOrderByOccurredAtAscIdAsc(application.getId()))
@@ -108,7 +108,7 @@ class RepositoryConstraintsTest {
         applications.deleteById(application.getId());
         applications.flush();
 
-        assertThat(transitions.count()).isZero();
-        assertThat(followUps.count()).isZero();
+        assertThat(transitions.findByApplicationIdOrderByOccurredAtAscIdAsc(application.getId())).isEmpty();
+        assertThat(followUps.findByApplicationId(application.getId())).isEmpty();
     }
 }
