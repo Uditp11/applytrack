@@ -20,6 +20,14 @@ jobs:
       - name: Build and test
         run: ./mvnw -B verify
 
+      - name: Fail if any test was skipped
+        # Database tests skip themselves when Docker is missing. CI has Docker, so a skip here means something broke.
+        run: |
+          if grep -l 'skipped="[1-9]' target/surefire-reports/TEST-*.xml; then
+            echo "Some tests were skipped"
+            exit 1
+          fi
+
       - name: Build Docker image
         run: docker build -t applytrack:ci .
 
@@ -29,7 +37,8 @@ jobs:
           docker run -d --name db --network applytrack \
             -e POSTGRES_DB=applytrack -e POSTGRES_USER=applytrack -e POSTGRES_PASSWORD=applytrack \
             postgres:17-alpine
-          until docker exec db pg_isready -U applytrack -d applytrack; do sleep 1; done
+          # Ask over TCP: the image starts a temporary server on the Unix socket first.
+          timeout 60 sh -c 'until docker exec db pg_isready -h 127.0.0.1 -U applytrack -d applytrack; do sleep 1; done'
           docker run -d --name applytrack --network applytrack -p 8080:8080 \
             -e DB_URL=jdbc:postgresql://db:5432/applytrack \
             applytrack:ci
