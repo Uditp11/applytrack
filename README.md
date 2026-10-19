@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml/badge.svg)](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml)
 
-Status: in progress. The REST API with PostgreSQL storage (M1) and statistics, metrics and the docker compose stack (M2) are done. See the roadmap below.
+Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and the Kubernetes deployment tested on kind (M3). See the roadmap below.
 
 ## Goal
 
@@ -25,7 +25,7 @@ flowchart LR
   tf[Terraform] --> azure[Azure deployment]
 ```
 
-The service, PostgreSQL, Prometheus, Grafana, the Docker image and the CI build exist today. kind and Terraform are the targets of the next milestones.
+The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind) exist today. Terraform for Azure is the target of the next milestone.
 
 Code layout under `src/main/java/io/github/uditp11/applytrack`:
 
@@ -41,7 +41,7 @@ The schema lives in `src/main/resources/db/migration` and is applied by Flyway a
 
 - [x] **M1** Entities, Flyway migrations, repositories, services with the status state machine, controllers, DTOs, validation, RFC 7807 error responses. Mockito unit tests and Testcontainers integration tests.
 - [x] **M2** `GET /api/stats` with a SQL aggregate query and its indexes. `docker-compose.yml` with the app, PostgreSQL, Prometheus and Grafana. A custom Micrometer metric and a provisioned Grafana dashboard.
-- [ ] **M3** Kubernetes manifests with Actuator probes, ConfigMap and a Secret template. A CI job that deploys to a kind cluster and runs a smoke test.
+- [x] **M3** Kubernetes manifests with Actuator probes, ConfigMap and a Secret template. A CI job that deploys to a kind cluster and runs a smoke test.
 - [ ] **M4** Terraform for an Azure deployment that stays within the free tier, plus a teardown script.
 - [ ] **M5** Measured results in this README and an OpenAPI screenshot.
 
@@ -94,6 +94,30 @@ docker compose up --build
 | Grafana | http://localhost:3000, dashboard "ApplyTrack" (viewing needs no login; admin password `admin` unless `GRAFANA_ADMIN_PASSWORD` is set) |
 
 Prometheus scrapes `/actuator/prometheus` every 15 seconds. Grafana starts with the Prometheus datasource and the dashboard already provisioned from `grafana/`. With the stack running, `scripts/compose-smoke.sh` creates sample data and checks that the counter reached Prometheus and that Grafana has the dashboard; CI runs the same script on every push. `docker compose down -v` removes everything, including the database volume.
+
+### On Kubernetes with kind
+
+[kind](https://kind.sigs.k8s.io/) runs a Kubernetes cluster inside Docker. You need Docker, kind and kubectl.
+
+```bash
+kind create cluster --name applytrack
+docker build -t applytrack:ci .
+kind load docker-image applytrack:ci --name applytrack
+
+kubectl create namespace applytrack
+kubectl -n applytrack create secret generic applytrack-db \
+  --from-literal=DB_USER=applytrack --from-literal=DB_PASSWORD='choose-a-password'
+kubectl apply -k k8s/
+kubectl -n applytrack rollout status deployment/applytrack
+
+kubectl -n applytrack port-forward service/applytrack 8080:80
+# in another terminal
+scripts/smoke.sh
+
+kind delete cluster --name applytrack
+```
+
+`k8s/` holds a namespace, a ConfigMap with the database URL, a demo PostgreSQL (its storage is temporary, fine for a test cluster only), and the app: a Deployment with two replicas and a Service. `k8s/secret.template.yaml` only shows the shape of the database Secret; the real Secret is created with `kubectl create secret` and never stored in the repository. CI runs these exact steps on every push.
 
 ## Using the API
 
@@ -157,6 +181,7 @@ Every status change also increments the Prometheus counter `applytrack_status_tr
 - One application per posting, unique company names, and no deleting a company that still has postings are constraints in the Flyway migration. The API reports them as 409 without exposing SQL. Hibernate only validates the schema; it never changes it.
 - Errors are RFC 7807 problem details: every error response has the same JSON shape (`type`, `title`, `status`, `detail`), and validation errors add an `errors` object with one message per field.
 - Applications carry a version number (optimistic locking). When two requests change the same application at the same time, the later save fails with a 409 instead of overwriting the first.
+- Kubernetes probes use Spring Boot's health groups. Liveness (`/actuator/health/liveness`) does not check the database, because a failing liveness probe restarts the pod and a database outage would then restart every pod for nothing. Readiness (`/actuator/health/readiness`) does check the database, so a pod that lost its connection stops receiving traffic until it is back. A startup probe gives the JVM and Flyway up to two minutes before liveness starts counting.
 
 ## Versions
 
@@ -173,3 +198,4 @@ Checked on 2026-10-18:
 | Testcontainers | 1.21.4 | Managed by Spring Boot |
 | Prometheus | 3.15.0 | `prom/prometheus:v3.15.0` in docker compose |
 | Grafana | 13.2.3 | `grafana/grafana:13.2.3` in docker compose |
+| kind | 0.33.0 | Through `helm/kind-action@v1.15.0` in CI |
