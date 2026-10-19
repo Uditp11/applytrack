@@ -21,10 +21,11 @@ terraform init -input=false \
   -backend-config="key=applytrack.tfstate" \
   -backend-config="use_azuread_auth=true"
 
-# Destroy needs every variable to have a value, but the values do not matter for deleting.
+# Destroy needs every variable to have a value. Most values do not matter for deleting, but the provider still
+# checks the budget start date (first day of a month, not before June 2017), so pass the current month.
 terraform destroy -auto-approve -input=false \
   -var="image=unused" \
   -var="budget_alert_email=unused@example.com" \
-  -var="budget_start_date=2000-01-01T00:00:00Z"
+  -var="budget_start_date=$(date -u +%Y-%m-01T00:00:00Z)"
 
 echo "Everything Terraform created for ApplyTrack is deleted (resource group applytrack-rg)."
