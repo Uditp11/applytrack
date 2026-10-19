@@ -91,7 +91,7 @@ jobs:
 
       - name: Deploy
         run: |
-          kubectl create namespace applytrack
+          kubectl apply -f k8s/namespace.yaml
           # A throwaway password for this test cluster only; real values never live in the repository.
           kubectl -n applytrack create secret generic applytrack-db \
             --from-literal=DB_USER=applytrack --from-literal=DB_PASSWORD="$(openssl rand -hex 16)"
@@ -109,5 +109,7 @@ jobs:
         run: |
           kubectl -n applytrack get pods,services,events -o wide || true
           kubectl -n applytrack describe pods || true
-          kubectl -n applytrack logs deployment/applytrack --all-containers --tail=200 || true
+          kubectl -n applytrack logs -l app=applytrack --all-containers --prefix --tail=200 || true
+          kubectl -n applytrack logs -l app=applytrack --all-containers --prefix --previous --tail=200 || true
+          kubectl -n applytrack logs deployment/db --tail=100 || true
           cat port-forward.log || true

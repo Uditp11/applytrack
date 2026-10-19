@@ -24,9 +24,10 @@ post "/api/applications/$application/transitions" '{"status":"APPLIED"}' >/dev/n
 post "/api/applications/$application/transitions" '{"status":"INTERVIEW"}' >/dev/null
 echo "ok: created application $application and moved it to INTERVIEW"
 
-code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+refused=$(curl -sS -w '\n%{http_code}' -H 'Content-Type: application/json' \
   -d '{"status":"DRAFT"}' "$APP_URL/api/applications/$application/transitions")
-[ "$code" = 409 ] || fail "moving INTERVIEW back to DRAFT returned $code, expected 409"
+[ "${refused##*$'\n'}" = 409 ] || fail "moving INTERVIEW back to DRAFT did not return 409: $refused"
+grep -q '"title":"Illegal status transition"' <<<"$refused" || fail "the 409 is not an illegal transition: $refused"
 echo "ok: an illegal move is refused with 409"
 
 fetch_contains '"responded":[1-9]' "$APP_URL/api/stats" || fail "stats do not count the response"

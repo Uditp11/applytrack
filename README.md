@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml/badge.svg)](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml)
 
-Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and the Kubernetes deployment tested on kind (M3). See the roadmap below.
+Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and Kubernetes manifests with a CI deployment to a kind cluster (M3). See the roadmap below.
 
 ## Goal
 
@@ -104,7 +104,7 @@ kind create cluster --name applytrack
 docker build -t applytrack:ci .
 kind load docker-image applytrack:ci --name applytrack
 
-kubectl create namespace applytrack
+kubectl apply -f k8s/namespace.yaml
 kubectl -n applytrack create secret generic applytrack-db \
   --from-literal=DB_USER=applytrack --from-literal=DB_PASSWORD='choose-a-password'
 kubectl apply -k k8s/
@@ -117,7 +117,7 @@ scripts/smoke.sh
 kind delete cluster --name applytrack
 ```
 
-`k8s/` holds a namespace, a ConfigMap with the database URL, a demo PostgreSQL (its storage is temporary, fine for a test cluster only), and the app: a Deployment with two replicas and a Service. `k8s/secret.template.yaml` only shows the shape of the database Secret; the real Secret is created with `kubectl create secret` and never stored in the repository. CI runs these exact steps on every push.
+`k8s/` holds a namespace, a ConfigMap with the database URL, a demo PostgreSQL (its storage is temporary, fine for a test cluster only), and the app: a Deployment with two replicas and a Service. `k8s/secret.template.yaml` only shows the shape of the database Secret; the real Secret is created with `kubectl create secret` and never stored in the repository. CI runs the same steps (with a random password) on every push to main and on pull requests.
 
 ## Using the API
 
