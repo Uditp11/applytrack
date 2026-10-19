@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml/badge.svg)](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml)
 
-Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and Kubernetes manifests with a CI deployment to a kind cluster (M3). The Azure deployment (M4) is written and checked, but has not been deployed yet. See the roadmap below.
+Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and Kubernetes manifests with a CI deployment to a kind cluster (M3). Measured results and the OpenAPI screenshot (M5) are below. The Azure deployment (M4) is written and checked, but has not been deployed yet. See the roadmap below.
 
 ## Goal
 
@@ -43,7 +43,7 @@ The schema lives in `src/main/resources/db/migration` and is applied by Flyway a
 - [x] **M2** `GET /api/stats` with a SQL aggregate query and its indexes. `docker-compose.yml` with the app, PostgreSQL, Prometheus and Grafana. A custom Micrometer metric and a provisioned Grafana dashboard.
 - [x] **M3** Kubernetes manifests with Actuator probes, ConfigMap and a Secret template. A CI job that deploys to a kind cluster and runs a smoke test.
 - [ ] **M4** Terraform for an Azure deployment that stays within the free tier, plus a teardown script. Written and validated in CI; not deployed yet.
-- [ ] **M5** Measured results in this README and an OpenAPI screenshot.
+- [x] **M5** Measured results in this README and an OpenAPI screenshot.
 
 ## How to run
 
@@ -198,10 +198,12 @@ Measured, not estimated. Each number says where it comes from.
 
 | What | Result | Source |
 |---|---|---|
-| Tests | 86: 57 unit, 11 web layer, 14 database, 4 end to end; 0 failures, 0 skipped | The full suite against a real PostgreSQL 17 on 2026-10-19; CI runs it on every push with Testcontainers |
+| Tests | 86: 57 unit, 11 web layer, 14 database, 4 end to end; 0 failures, 0 skipped | `build` job of CI run 39225522356 (Testcontainers, PostgreSQL 17), and locally against a real PostgreSQL 17 |
 | Skipped tests in CI | 0 (a CI step fails the build if any test is skipped) | Every CI run since the database tests were added |
 | Executable jar | 63.0 MB (63,017,569 bytes) | `target/applytrack-0.1.0-SNAPSHOT.jar` after `./mvnw package` |
-| Startup time | 14.2 s, 15.1 s and 21.7 s in three runs, Flyway migration on an empty database included | "Started ApplyTrackApplication in ..." log line, `java -jar` on a development laptop (Windows 11, JDK 21) |
+| Startup time, laptop | 14.2 s, 15.1 s and 21.7 s in three runs, Flyway migration on an empty database included | "Started ApplyTrackApplication in ..." log line, `java -jar` on a development laptop (Windows 11, JDK 21) |
+| Startup time, CI container | 4.7 s, Flyway migration on an empty database included | "Started ApplyTrackApplication in 4.713 seconds" in the `build` job of CI run 39225522356 (GitHub-hosted Ubuntu runner, image `applytrack:ci` with PostgreSQL 17) |
+| Docker image | 382 MB (uncompressed, JRE base image plus the jar) | `docker image ls` in the `build` job of CI run 39225522356 |
 | Kubernetes | Two replicas ready and the smoke test passing on a kind cluster | CI job `kind` |
 
 ## Design decisions
