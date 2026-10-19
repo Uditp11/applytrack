@@ -114,3 +114,21 @@ jobs:
           kubectl -n applytrack logs -l app=applytrack --all-containers --prefix --previous --tail=200 || true
           kubectl -n applytrack logs deployment/db --tail=100 || true
           cat port-forward.log || true
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+
+      # Checks the Azure configuration without logging in to Azure: formatting, provider download, schema.
+      - name: Check the Terraform configuration
+        working-directory: terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
