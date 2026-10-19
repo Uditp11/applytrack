@@ -25,8 +25,9 @@ public class StatsRepository {
     public Map<ApplicationStatus, Long> countByStatus() {
         Map<ApplicationStatus, Long> counts = new EnumMap<>(ApplicationStatus.class);
         jdbc.sql("select status, count(*) as n from application group by status")
-                .query((row, rowNumber) -> counts.put(ApplicationStatus.valueOf(row.getString("status")), row.getLong("n")))
-                .list();
+                .query(row -> {
+                    counts.put(ApplicationStatus.valueOf(row.getString("status")), row.getLong("n"));
+                });
         return counts;
     }
 

@@ -11,6 +11,14 @@ GRAFANA_AUTH="admin:${GRAFANA_ADMIN_PASSWORD:-admin}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
+# fetch_contains <pattern> <curl arguments...>: true if the response body matches the pattern.
+# The body goes into a variable first: piping curl into "grep -q" can fail when grep stops reading early.
+fetch_contains() {
+  local pattern=$1 body; shift
+  body=$(curl -fsS "$@") || return 1
+  grep -q "$pattern" <<<"$body"
+}
+
 # wait_for <description> <seconds> <command...>: retries the command once per second.
 wait_for() {
   local what=$1 seconds=$2; shift 2
@@ -24,7 +32,7 @@ wait_for() {
 post() { curl -fsS -H 'Content-Type: application/json' -d "$2" "$APP_URL$1"; }
 id_of() { sed -E 's/^\{"id":([0-9]+).*/\1/'; }
 
-wait_for "app health is UP" 90 sh -c "curl -fsS $APP_URL/actuator/health | grep -q '\"status\":\"UP\"'"
+wait_for "app health is UP" 90 fetch_contains '"status":"UP"' "$APP_URL/actuator/health"
 
 # Fictional sample data. The name carries the time so the script can run more than once.
 company=$(post /api/companies "{\"name\":\"Smoke Test Logistics $(date +%s)\"}" | id_of)
@@ -34,18 +42,19 @@ post "/api/applications/$application/transitions" '{"status":"APPLIED"}' >/dev/n
 post "/api/applications/$application/transitions" '{"status":"INTERVIEW"}' >/dev/null
 echo "ok: created application $application and moved it to INTERVIEW"
 
-curl -fsS "$APP_URL/api/stats" | grep -q '"responded":[1-9]' || fail "stats do not count the response"
+fetch_contains '"responded":[1-9]' "$APP_URL/api/stats" || fail "stats do not count the response"
 echo "ok: /api/stats counts the response"
 
-# Prometheus scrapes every 15 seconds, so give it time to see the new counter.
-wait_for "Prometheus has scraped applytrack_status_transitions_total" 90 sh -c \
-  "curl -fsS '$PROMETHEUS_URL/api/v1/query?query=applytrack_status_transitions_total' | grep -q '\"to\":\"INTERVIEW\"'"
+# Prometheus scrapes every 15 seconds, so give it time. Every counter exists at 0 from startup, so ask for > 0.
+wait_for "Prometheus has scraped the INTERVIEW move" 90 fetch_contains '"to":"INTERVIEW"' \
+  --get --data-urlencode 'query=applytrack_status_transitions_total{to="INTERVIEW"} > 0' \
+  "$PROMETHEUS_URL/api/v1/query"
 
-wait_for "Grafana is up" 60 curl -fsS "$GRAFANA_URL/api/health"
-curl -fsS -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/datasources/uid/prometheus" | grep -q '"type":"prometheus"' \
+wait_for "Grafana is up" 60 fetch_contains '"database"' "$GRAFANA_URL/api/health"
+fetch_contains '"type":"prometheus"' -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/datasources/uid/prometheus" \
   || fail "Grafana has no provisioned Prometheus datasource"
 echo "ok: Grafana datasource provisioned"
-curl -fsS -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/dashboards/uid/applytrack" | grep -q '"title":"ApplyTrack"' \
+fetch_contains '"title":"ApplyTrack"' -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/dashboards/uid/applytrack" \
   || fail "Grafana has no provisioned ApplyTrack dashboard"
 echo "ok: Grafana dashboard provisioned"
 

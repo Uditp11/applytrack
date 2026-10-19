@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.uditp11.applytrack.domain.ApplicationStatus;
@@ -22,8 +23,8 @@ public class StatsService {
         this.repository = repository;
     }
 
-    /** Read-only transaction: both queries see the same snapshot of the data. */
-    @Transactional(readOnly = true)
+    /** Repeatable read: both queries see the same snapshot, even if an application moves in between. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public StatsResponse stats() {
         Map<ApplicationStatus, Long> found = repository.countByStatus();
         Map<ApplicationStatus, Long> byStatus = new LinkedHashMap<>();
