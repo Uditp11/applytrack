@@ -4,9 +4,9 @@ variable "subscription_id" {
 }
 
 variable "location" {
-  description = "Azure region. scripts/azure-bootstrap.sh checks that the free PostgreSQL B1ms size is available there."
+  description = "Azure region. Azure for Students only allows some regions, and PostgreSQL B1ms is not offered everywhere; scripts/azure-bootstrap.sh checks the size."
   type        = string
-  default     = "germanywestcentral"
+  default     = "francecentral"
 }
 
 variable "name" {

@@ -6,12 +6,12 @@
 #      a managed identity also works where a student account may not register applications)
 # Then it prints the values to save as GitHub repository secrets. Safe to run again: the names are fixed.
 # Usage: scripts/azure-bootstrap.sh <github-owner>/<repository>   e.g. scripts/azure-bootstrap.sh Uditp11/applytrack
-#        LOCATION=westeurope scripts/azure-bootstrap.sh ...         to use another region
+#        LOCATION=swedencentral scripts/azure-bootstrap.sh ...      to use another allowed region
 set -euo pipefail
 export MSYS_NO_PATHCONV=1   # Git Bash on Windows: do not turn /subscriptions/... into a Windows path
 
 repo=${1:?usage: scripts/azure-bootstrap.sh <github-owner>/<repository>   (exact case, as on GitHub)}
-location=${LOCATION:-germanywestcentral}
+location=${LOCATION:-francecentral}   # allowed for Azure for Students, and offers PostgreSQL B1ms
 state_rg=applytrack-tfstate-rg
 identity=applytrack-deploy
 
