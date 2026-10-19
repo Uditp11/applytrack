@@ -25,6 +25,14 @@ management:
   endpoint:
     health:
       show-components: always
+      # Kubernetes probes: /actuator/health/liveness (is the process alive?) and /actuator/health/readiness
+      # (can it serve requests?). Readiness also checks the database; liveness must not, or a database
+      # outage would make Kubernetes restart every pod.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 
 springdoc:
   swagger-ui:

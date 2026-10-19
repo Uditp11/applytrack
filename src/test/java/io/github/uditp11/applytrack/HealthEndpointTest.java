@@ -28,4 +28,22 @@ class HealthEndpointTest {
         assertThat(response.getBody()).contains("\"status\":\"UP\"");
         assertThat(response.getBody()).contains("\"db\":{\"status\":\"UP\"");
     }
+
+    /** Kubernetes restarts a pod whose liveness fails, so liveness must not depend on the database. */
+    @Test
+    void livenessIsUpAndDoesNotIncludeTheDatabase() {
+        ResponseEntity<String> response = http.getForEntity("/actuator/health/liveness", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"").doesNotContain("\"db\"");
+    }
+
+    /** Kubernetes stops sending traffic to a pod whose readiness fails, so readiness checks the database. */
+    @Test
+    void readinessIsUpAndIncludesTheDatabase() {
+        ResponseEntity<String> response = http.getForEntity("/actuator/health/readiness", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"").contains("\"db\":{\"status\":\"UP\"");
+    }
 }
