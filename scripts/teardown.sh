@@ -15,7 +15,8 @@ terraform init -input=false \
   -backend-config="resource_group_name=$TF_STATE_RESOURCE_GROUP" \
   -backend-config="storage_account_name=$TF_STATE_STORAGE_ACCOUNT" \
   -backend-config="container_name=${TF_STATE_CONTAINER:-tfstate}" \
-  -backend-config="key=applytrack.tfstate"
+  -backend-config="key=applytrack.tfstate" \
+  -backend-config="use_azuread_auth=true"
 
 # Destroy needs every variable to have a value, but the values do not matter for deleting.
 terraform destroy -auto-approve -input=false \
