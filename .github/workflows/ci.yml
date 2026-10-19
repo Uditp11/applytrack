@@ -71,3 +71,43 @@ jobs:
       - name: Stop the stack
         if: always()
         run: docker compose down -v
+
+  kind:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create a kind cluster
+        uses: helm/kind-action@v1.15.0
+        with:
+          version: v0.33.0
+          cluster_name: applytrack
+
+      - name: Build the image and load it into the cluster
+        run: |
+          docker build -t applytrack:ci .
+          kind load docker-image applytrack:ci --name applytrack
+
+      - name: Deploy
+        run: |
+          kubectl create namespace applytrack
+          # A throwaway password for this test cluster only; real values never live in the repository.
+          kubectl -n applytrack create secret generic applytrack-db \
+            --from-literal=DB_USER=applytrack --from-literal=DB_PASSWORD="$(openssl rand -hex 16)"
+          kubectl apply -k k8s/
+          kubectl -n applytrack rollout status deployment/db --timeout=180s
+          kubectl -n applytrack rollout status deployment/applytrack --timeout=300s
+
+      - name: Smoke test through the Service
+        run: |
+          kubectl -n applytrack port-forward service/applytrack 8080:80 > port-forward.log 2>&1 &
+          scripts/smoke.sh
+
+      - name: Show cluster state if something failed
+        if: failure()
+        run: |
+          kubectl -n applytrack get pods,services,events -o wide || true
+          kubectl -n applytrack describe pods || true
+          kubectl -n applytrack logs deployment/applytrack --all-containers --tail=200 || true
+          cat port-forward.log || true
