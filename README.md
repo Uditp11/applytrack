@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml/badge.svg)](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml)
 
-Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and Kubernetes manifests with a CI deployment to a kind cluster (M3). See the roadmap below.
+Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and Kubernetes manifests with a CI deployment to a kind cluster (M3). The Azure deployment (M4) is written and checked, but has not been deployed yet. See the roadmap below.
 
 ## Goal
 
@@ -25,7 +25,7 @@ flowchart LR
   tf[Terraform] --> azure[Azure deployment]
 ```
 
-The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind) exist today. Terraform for Azure is the target of the next milestone.
+The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind, terraform) exist today. The Terraform for Azure exists and passes `terraform validate`; it has not been applied to a real Azure subscription yet.
 
 Code layout under `src/main/java/io/github/uditp11/applytrack`:
 
@@ -42,7 +42,7 @@ The schema lives in `src/main/resources/db/migration` and is applied by Flyway a
 - [x] **M1** Entities, Flyway migrations, repositories, services with the status state machine, controllers, DTOs, validation, RFC 7807 error responses. Mockito unit tests and Testcontainers integration tests.
 - [x] **M2** `GET /api/stats` with a SQL aggregate query and its indexes. `docker-compose.yml` with the app, PostgreSQL, Prometheus and Grafana. A custom Micrometer metric and a provisioned Grafana dashboard.
 - [x] **M3** Kubernetes manifests with Actuator probes, ConfigMap and a Secret template. A CI job that deploys to a kind cluster and runs a smoke test.
-- [ ] **M4** Terraform for an Azure deployment that stays within the free tier, plus a teardown script.
+- [ ] **M4** Terraform for an Azure deployment that stays within the free tier, plus a teardown script. Written and validated in CI; not deployed yet.
 - [ ] **M5** Measured results in this README and an OpenAPI screenshot.
 
 ## How to run
@@ -118,6 +118,19 @@ kind delete cluster --name applytrack
 ```
 
 `k8s/` holds a namespace, a ConfigMap with the database URL, a demo PostgreSQL (its storage is temporary, fine for a test cluster only), and the app: a Deployment with two replicas and a Service. `k8s/secret.template.yaml` only shows the shape of the database Secret; the real Secret is created with `kubectl create secret` and never stored in the repository. CI runs the same steps (with a random password) on every push to main and on pull requests.
+
+### On Azure (written, not deployed yet)
+
+`terraform/` describes an Azure deployment chosen to stay inside the free offers: Azure Container Apps on the consumption plan, scaled to zero when idle, and Azure Database for PostgreSQL Flexible Server on the B1ms size with 32 GB. There is no container registry (the image comes from GitHub Container Registry) and no Log Analytics workspace, because both are billed. A resource group budget sends an e-mail as soon as anything costs money.
+
+CI checks the configuration on every push (`terraform fmt -check`, `terraform init -backend=false`, `terraform validate`) without logging in to Azure. Nothing has been planned or applied against a real subscription yet.
+
+To deploy, once:
+
+1. Log in with `az login` and run `scripts/azure-bootstrap.sh <owner>/<repository>`. It creates a storage account for the Terraform state and an identity that GitHub Actions can use through OpenID Connect, so no Azure password or key is stored anywhere.
+2. Save the values it prints as GitHub repository secrets.
+
+Then start the "Deploy to Azure" workflow by hand with `apply`: it builds and pushes the image, runs `terraform apply` and smoke tests the app. The same workflow with `destroy`, or `scripts/teardown.sh` from a laptop, deletes everything again.
 
 ## Using the API
 
@@ -199,3 +212,4 @@ Checked on 2026-10-18:
 | Prometheus | 3.15.0 | `prom/prometheus:v3.15.0` in docker compose |
 | Grafana | 13.2.3 | `grafana/grafana:13.2.3` in docker compose |
 | kind | 0.33.0 | Through `helm/kind-action@v1.15.0` in CI |
+| Terraform | 1.16.5 | With the `hashicorp/azurerm` provider 5.8.0 |
