@@ -188,6 +188,22 @@ Every status change also increments the Prometheus counter `applytrack_status_tr
 | Follow-ups | `GET/POST /api/follow-ups` (`?applicationId=`, `?done=`), `GET/PUT/DELETE /api/follow-ups/{id}` |
 | Statistics | `GET /api/stats` |
 
+The OpenAPI page of the running app (`/swagger-ui`):
+
+![Swagger UI of the ApplyTrack API](images/swagger-ui.png)
+
+## Results
+
+Measured, not estimated. Each number says where it comes from.
+
+| What | Result | Source |
+|---|---|---|
+| Tests | 86: 57 unit, 11 web layer, 14 database, 4 end to end; 0 failures | `./mvnw -B verify` against a real PostgreSQL 17, 2026-10-19 |
+| Skipped tests in CI | 0 (a CI step fails the build if any test is skipped) | Every CI run since the database tests were added |
+| Executable jar | 63.0 MB (63,017,569 bytes) | `target/applytrack-0.1.0-SNAPSHOT.jar` after `./mvnw package` |
+| Startup time | 14.2 s, 15.1 s and 21.7 s in three runs, Flyway migration on an empty database included | "Started ApplyTrackApplication in ..." log line, `java -jar` on a development laptop (Windows 11, JDK 21) |
+| Kubernetes | Two replicas ready and the smoke test passing on a kind cluster | CI job `kind` |
+
 ## Design decisions
 
 - An application can move DRAFT to APPLIED, APPLIED to INTERVIEW or REJECTED, INTERVIEW to OFFER or REJECTED, and from any of DRAFT, APPLIED or INTERVIEW to WITHDRAWN; every other move, including staying on the same status, is refused with 409. The rule table sits on the `ApplicationStatus` enum, so a parameterized test checks all 36 pairs without Spring or a database.
