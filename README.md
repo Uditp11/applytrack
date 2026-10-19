@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml/badge.svg)](https://github.com/Uditp11/applytrack/actions/workflows/ci.yml)
 
-Status: in progress. Done: the REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), and Kubernetes manifests with a CI deployment to a kind cluster (M3). Measured results and the OpenAPI screenshot (M5) are below. The Azure deployment (M4) is written and checked, but has not been deployed yet. See the roadmap below.
+Status: v1 complete. The REST API with PostgreSQL storage (M1), statistics, metrics and the docker compose stack (M2), Kubernetes manifests with a CI deployment to a kind cluster (M3), the Azure deployment, deployed once and removed again (M4), and measured results (M5).
 
 ## Goal
 
@@ -25,7 +25,7 @@ flowchart LR
   tf[Terraform] --> azure[Azure deployment]
 ```
 
-The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind, terraform) exist today. The Terraform for Azure exists and passes `terraform validate`; it has not been applied to a real Azure subscription yet.
+The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind, terraform) exist today. The Terraform for Azure was applied once and destroyed again; the deploy workflow can bring the stack back at any time.
 
 Code layout under `src/main/java/io/github/uditp11/applytrack`:
 
@@ -42,7 +42,7 @@ The schema lives in `src/main/resources/db/migration` and is applied by Flyway a
 - [x] **M1** Entities, Flyway migrations, repositories, services with the status state machine, controllers, DTOs, validation, RFC 7807 error responses. Mockito unit tests and Testcontainers integration tests.
 - [x] **M2** `GET /api/stats` with a SQL aggregate query and its indexes. `docker-compose.yml` with the app, PostgreSQL, Prometheus and Grafana. A custom Micrometer metric and a provisioned Grafana dashboard.
 - [x] **M3** Kubernetes manifests with Actuator probes, ConfigMap and a Secret template. A CI job that deploys to a kind cluster and runs a smoke test.
-- [ ] **M4** Terraform for an Azure deployment that stays within the free tier, plus a teardown script. Written and validated in CI; not deployed yet.
+- [x] **M4** Terraform for an Azure deployment that stays within the free tier, plus a teardown script. Deployed once and removed again (see "On Azure").
 - [x] **M5** Measured results in this README and an OpenAPI screenshot.
 
 ## How to run
@@ -119,13 +119,20 @@ kind delete cluster --name applytrack
 
 `k8s/` holds a namespace, a ConfigMap with the database URL, a demo PostgreSQL (its storage is temporary, fine for a test cluster only), and the app: a Deployment with two replicas and a Service. `k8s/secret.template.yaml` only shows the shape of the database Secret; the real Secret is created with `kubectl create secret` and never stored in the repository. CI runs the same steps (with a random password) on every push to main and on pull requests.
 
-### On Azure (written, not deployed yet)
+### On Azure (deployed once, then removed)
 
 `terraform/` describes an Azure deployment chosen to fit the free offers: Azure Container Apps on the consumption plan, scaled to zero when idle, and Azure Database for PostgreSQL Flexible Server on the B1ms size with 32 GB (free for 12 months for new accounts). There is no container registry (the image comes from GitHub Container Registry) and no Log Analytics workspace, because both are billed. Logs are still visible with `az containerapp logs show --follow`.
 
 Cost: the app costs nothing while scaled to zero, and normal demo use stays inside the monthly free grant of Container Apps. The PostgreSQL server runs all the time and is free only within the 12-month offer (750 hours a month), and the storage account for the Terraform state costs a few cents. The worst case is not zero: the app is public, and if outside traffic kept one replica busy all month it would go past the free grant (a few tens of dollars, taken from the Azure credit). The app allows at most one replica, a resource group budget e-mails on the first spend (Azure checks budgets with up to a day of delay), and the stack is meant to be removed after each demo. The database firewall allows Azure services, protected by a random 32-character password and TLS; a production setup would use a private network.
 
-CI checks the configuration on every push (`terraform fmt -check`, `terraform init -backend=false`, `terraform validate`) without logging in to Azure. Nothing has been planned or applied against a real subscription yet.
+CI checks the configuration on every push (`terraform fmt -check`, `terraform init -backend=false`, `terraform validate`) without logging in to Azure.
+
+The stack was deployed once with the workflow on 2026-10-19 and removed again the same day:
+
+- Deploy: workflow run 39238952445 in France Central, `Apply complete! Resources: 8 added, 0 changed, 0 destroyed.`, then the smoke test passed against the app's public HTTPS address.
+- Removal: run 39242851755 deleted the app, the database and the budget, then stopped on an Azure provider error while waiting for the Container Apps environment to be deleted; run 39243943257 finished the job, `Destroy complete! Resources: 1 destroyed.`
+- Azure for Students only allows a few regions, so the setup script checks the region and the default is France Central.
+- GitHub's login token now names the repository with its account and repository numbers, so Azure trusts both that form and the plain owner/repository name.
 
 To deploy, once:
 
@@ -205,6 +212,7 @@ Measured, not estimated. Each number says where it comes from.
 | Startup time, CI container | 4.7 s, Flyway migration on an empty database included | "Started ApplyTrackApplication in 4.713 seconds" in the `build` job of CI run 39225522356 (GitHub-hosted Ubuntu runner, image `applytrack:ci` with PostgreSQL 17) |
 | Docker image | 382 MB (uncompressed, JRE base image plus the jar) | `docker image ls` in the `build` job of CI run 39225522356 |
 | Kubernetes | Two replicas ready and the smoke test passing on a kind cluster | CI job `kind` |
+| Azure | Deployed (8 resources, smoke test passing) and removed again | "Deploy to Azure" runs 39238952445 (apply) and 39243943257 (destroy) |
 
 ## Design decisions
 
