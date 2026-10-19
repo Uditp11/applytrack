@@ -17,8 +17,20 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
+      # Without this, Kubernetes adds variables like DB_PORT=tcp://... for every Service, which could
+      # clash with the app's own DB_ settings.
+      enableServiceLinks: false
+      # The app stops at startup if the database is not reachable yet, so wait for it first
+      # (the same job docker compose does with depends_on: service_healthy).
+      initContainers:
+        - name: wait-for-db
+          image: postgres:17-alpine
+          command: ["sh", "-c", "until pg_isready -h db -p 5432; do echo waiting for db; sleep 2; done"]
+          securityContext:
+            allowPrivilegeEscalation: false
       containers:
         - name: applytrack
+          # The tag (applytrack:ci) is set in kustomization.yaml, so apply with kubectl apply -k.
           image: applytrack
           # The image is built and loaded into kind, not pulled from a registry.
           imagePullPolicy: IfNotPresent
@@ -30,6 +42,10 @@ spec:
                 name: applytrack-config
             - secretRef:
                 name: applytrack-db
+          env:
+            # The JVM's default heap is a quarter of the memory limit; let it use most of it instead.
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=70
           securityContext:
             allowPrivilegeEscalation: false
           resources:
@@ -44,6 +60,7 @@ spec:
               path: /actuator/health/liveness
               port: http
             periodSeconds: 2
+            timeoutSeconds: 3
             failureThreshold: 60
           # Liveness: is the process healthy? Failing restarts the container. No database check here.
           livenessProbe:
@@ -51,6 +68,7 @@ spec:
               path: /actuator/health/liveness
               port: http
             periodSeconds: 10
+            timeoutSeconds: 3
             failureThreshold: 3
           # Readiness: can it serve requests, database included? Failing removes the pod from the Service.
           readinessProbe:
@@ -58,6 +76,7 @@ spec:
               path: /actuator/health/readiness
               port: http
             periodSeconds: 5
+            timeoutSeconds: 3
             failureThreshold: 3
 ---
 apiVersion: v1
