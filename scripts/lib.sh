@@ -6,7 +6,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 # The body goes into a variable first: piping curl into "grep -q" can fail when grep stops reading early.
 fetch_contains() {
   local pattern=$1 body; shift
-  body=$(curl -fsS "$@") || return 1
+  body=$(curl -fsS --max-time "${CURL_MAX_TIME:-10}" "$@") || return 1
   grep -q "$pattern" <<<"$body"
 }
 

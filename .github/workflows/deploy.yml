@@ -78,13 +78,17 @@ jobs:
             -backend-config="container_name=tfstate" \
             -backend-config="key=applytrack.tfstate" \
             -backend-config="use_azuread_auth=true"
-          # Budgets must start on the first day of a month that is not in the past.
+          # A budget starts on the first day of a month; the current month is accepted.
           export TF_VAR_budget_start_date="$(date -u +%Y-%m-01T00:00:00Z)"
           terraform apply -auto-approve -input=false
           echo "APP_URL=$(terraform output -raw app_url)" >> "$GITHUB_ENV"
 
       - name: Smoke test the deployed app
         if: inputs.action == 'apply'
+        env:
+          # The app starts from zero replicas and runs Flyway on 0.5 vCPU, so give it longer than in CI.
+          SMOKE_WAIT_SECONDS: "240"
+          CURL_MAX_TIME: "20"
         run: scripts/smoke.sh
 
       - name: Destroy everything
