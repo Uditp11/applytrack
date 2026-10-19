@@ -25,7 +25,9 @@ spec:
       initContainers:
         - name: wait-for-db
           image: postgres:17-alpine
-          command: ["sh", "-c", "until pg_isready -h db -p 5432; do echo waiting for db; sleep 2; done"]
+          # -U only stops pg_isready from looking up the name of the current user: uid 10001 has no entry in
+          # this image, and without -U the check gives up ("no attempt") every time. No login happens.
+          command: ["sh", "-c", "until pg_isready -h db -p 5432 -U applytrack; do echo waiting for db; sleep 2; done"]
           securityContext:
             allowPrivilegeEscalation: false
       containers:

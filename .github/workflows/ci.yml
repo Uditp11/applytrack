@@ -109,6 +109,7 @@ jobs:
         run: |
           kubectl -n applytrack get pods,services,events -o wide || true
           kubectl -n applytrack describe pods || true
+          kubectl -n applytrack logs -l app=applytrack -c wait-for-db --prefix --tail=50 || true
           kubectl -n applytrack logs -l app=applytrack --all-containers --prefix --tail=200 || true
           kubectl -n applytrack logs -l app=applytrack --all-containers --prefix --previous --tail=200 || true
           kubectl -n applytrack logs deployment/db --tail=100 || true
