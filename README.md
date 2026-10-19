@@ -198,7 +198,7 @@ Measured, not estimated. Each number says where it comes from.
 
 | What | Result | Source |
 |---|---|---|
-| Tests | 86: 57 unit, 11 web layer, 14 database, 4 end to end; 0 failures | `./mvnw -B verify` against a real PostgreSQL 17, 2026-10-19 |
+| Tests | 86: 57 unit, 11 web layer, 14 database, 4 end to end; 0 failures, 0 skipped | The full suite against a real PostgreSQL 17 on 2026-10-19; CI runs it on every push with Testcontainers |
 | Skipped tests in CI | 0 (a CI step fails the build if any test is skipped) | Every CI run since the database tests were added |
 | Executable jar | 63.0 MB (63,017,569 bytes) | `target/applytrack-0.1.0-SNAPSHOT.jar` after `./mvnw package` |
 | Startup time | 14.2 s, 15.1 s and 21.7 s in three runs, Flyway migration on an empty database included | "Started ApplyTrackApplication in ..." log line, `java -jar` on a development laptop (Windows 11, JDK 21) |
