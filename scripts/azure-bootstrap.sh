@@ -52,9 +52,22 @@ az role assignment create --assignee-object-id "$me" --assignee-principal-type U
 az identity create --name "$identity" --resource-group "$state_rg" --location "$location" --output none
 client_id=$(az_value identity show --name "$identity" --resource-group "$state_rg" --query clientId)
 principal_id=$(az_value identity show --name "$identity" --resource-group "$state_rg" --query principalId)
-az identity federated-credential create --identity-name "$identity" --resource-group "$state_rg" --name github-main \
-  --issuer https://token.actions.githubusercontent.com --subject "repo:$repo:ref:refs/heads/main" \
-  --audiences api://AzureADTokenExchange --output none
+# GitHub's login token names the repository either as owner/repo or, in the newer format, with the account
+# and repository numbers added (owner@<owner id>/repo@<repo id>). Azure needs an exact match, so trust both.
+# The numbers never change, even if the account or repository is renamed.
+repo_json=$(curl -fsS "https://api.github.com/repos/$repo")
+repo_id=$(sed -n 's/^  "id": \([0-9]*\),$/\1/p' <<<"$repo_json" | head -1)
+owner_id=$(awk '/^  "owner": \{/ {inside=1} inside && /^    "id": / {gsub(/[^0-9]/, ""); print; exit}' <<<"$repo_json")
+: "${repo_id:?could not read the repository id from the GitHub API}" "${owner_id:?could not read the owner id}"
+add_subject() {   # add_subject <credential name> <subject>; skipped if it already exists
+  az identity federated-credential show --identity-name "$identity" --resource-group "$state_rg" --name "$1" \
+    --output none 2>/dev/null && return 0
+  az identity federated-credential create --identity-name "$identity" --resource-group "$state_rg" --name "$1" \
+    --issuer https://token.actions.githubusercontent.com --subject "$2" \
+    --audiences api://AzureADTokenExchange --output none
+}
+add_subject github-main "repo:$repo:ref:refs/heads/main"
+add_subject github-main-ids "repo:${repo%%/*}@$owner_id/${repo##*/}@$repo_id:ref:refs/heads/main"
 az role assignment create --assignee-object-id "$principal_id" --assignee-principal-type ServicePrincipal \
   --role Contributor --scope "/subscriptions/$subscription" --output none
 az role assignment create --assignee-object-id "$principal_id" --assignee-principal-type ServicePrincipal \
