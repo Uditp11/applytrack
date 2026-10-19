@@ -132,4 +132,12 @@ class ApplicationFlowTest {
         applications.moveTo(id, ApplicationStatus.APPLIED);
         assertThat(movesCounted("DRAFT", "APPLIED")).isEqualTo(before + 1);
     }
+
+    @Test
+    void theOpenApiDocumentNamesTheApi() {
+        JsonNode docs = http.getForObject("/v3/api-docs", JsonNode.class);
+
+        assertThat(docs.get("info").get("title").asText()).isEqualTo("ApplyTrack API");
+        assertThat(docs.get("paths").has("/api/applications/{id}/transitions")).isTrue();
+    }
 }

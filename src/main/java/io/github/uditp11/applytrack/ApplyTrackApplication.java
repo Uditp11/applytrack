@@ -7,7 +7,15 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.info.Info;
+
 @SpringBootApplication
+@OpenAPIDefinition(info = @Info(
+        title = "ApplyTrack API",
+        version = "0.1.0",
+        description = "Track job applications: companies, postings, contacts, applications with a status "
+                + "state machine, follow-ups and statistics. All sample data is fictional."))
 public class ApplyTrackApplication {
 
     public static void main(String[] args) {
