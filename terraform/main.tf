@@ -97,6 +97,11 @@ resource "azurerm_container_app" "app" {
         name        = "DB_PASSWORD"
         secret_name = "db-password"
       }
+      # The app is public here and nothing scrapes metrics, so only health stays exposed under /actuator.
+      env {
+        name  = "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE"
+        value = "health"
+      }
 
       startup_probe {
         transport               = "HTTP"
@@ -117,9 +122,13 @@ resource "azurerm_container_app" "app" {
       }
     }
   }
+
+  # The app runs Flyway against the database at startup, so the firewall must already let it in.
+  depends_on = [azurerm_postgresql_flexible_server_firewall_rule.azure_services]
 }
 
-# Any actual spend above 1% of the budget sends an e-mail.
+# Any actual spend above 1% of the budget sends an e-mail. Azure evaluates budgets with a delay of up to about a
+# day, so this is a safety net, not an instant alarm.
 resource "azurerm_consumption_budget_resource_group" "main" {
   name              = "${var.name}-budget"
   resource_group_id = azurerm_resource_group.main.id
@@ -136,5 +145,10 @@ resource "azurerm_consumption_budget_resource_group" "main" {
     threshold      = 1
     threshold_type = "Actual"
     contact_emails = [var.budget_alert_email]
+  }
+
+  # The deploy workflow passes the current month's first day; keep the start date of the first apply.
+  lifecycle {
+    ignore_changes = [time_period]
   }
 }

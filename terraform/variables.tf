@@ -4,7 +4,7 @@ variable "subscription_id" {
 }
 
 variable "location" {
-  description = "Azure region. Pick one where the free PostgreSQL B1ms offer is available."
+  description = "Azure region. scripts/azure-bootstrap.sh checks that the free PostgreSQL B1ms size is available there."
   type        = string
   default     = "germanywestcentral"
 }
@@ -23,6 +23,11 @@ variable "image" {
 variable "budget_alert_email" {
   description = "Where the budget alert e-mail goes."
   type        = string
+
+  validation {
+    condition     = can(regex("^[^@ ]+@[^@ ]+\\.[^@ ]+$", var.budget_alert_email))
+    error_message = "The budget_alert_email value must be an e-mail address."
+  }
 }
 
 variable "budget_amount" {
@@ -32,6 +37,6 @@ variable "budget_amount" {
 }
 
 variable "budget_start_date" {
-  description = "First day of the month the budget starts, as YYYY-MM-01T00:00:00Z. Azure rejects dates in the past."
+  description = "First day of a month, as YYYY-MM-01T00:00:00Z. The deploy workflow passes the current month."
   type        = string
 }

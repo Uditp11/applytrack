@@ -121,16 +121,19 @@ kind delete cluster --name applytrack
 
 ### On Azure (written, not deployed yet)
 
-`terraform/` describes an Azure deployment chosen to stay inside the free offers: Azure Container Apps on the consumption plan, scaled to zero when idle, and Azure Database for PostgreSQL Flexible Server on the B1ms size with 32 GB. There is no container registry (the image comes from GitHub Container Registry) and no Log Analytics workspace, because both are billed. A resource group budget sends an e-mail as soon as anything costs money.
+`terraform/` describes an Azure deployment chosen to fit the free offers: Azure Container Apps on the consumption plan, scaled to zero when idle, and Azure Database for PostgreSQL Flexible Server on the B1ms size with 32 GB (free for 12 months for new accounts). There is no container registry (the image comes from GitHub Container Registry) and no Log Analytics workspace, because both are billed. Logs are still visible with `az containerapp logs show --follow`.
+
+Cost: idle costs nothing, and normal demo use stays inside the monthly free grant of Container Apps. The worst case is not zero: the app is public, and if outside traffic kept one replica busy all month it would go past the free grant (a few tens of dollars, taken from the Azure credit). The app allows at most one replica, a resource group budget e-mails on the first spend (Azure checks budgets with up to a day of delay), and the stack is meant to be removed after each demo. The database firewall allows Azure services, protected by a random 32-character password and TLS; a production setup would use a private network.
 
 CI checks the configuration on every push (`terraform fmt -check`, `terraform init -backend=false`, `terraform validate`) without logging in to Azure. Nothing has been planned or applied against a real subscription yet.
 
 To deploy, once:
 
-1. Log in with `az login` and run `scripts/azure-bootstrap.sh <owner>/<repository>`. It creates a storage account for the Terraform state and an identity that GitHub Actions can use through OpenID Connect, so no Azure password or key is stored anywhere.
+1. Log in with `az login` and run `scripts/azure-bootstrap.sh <owner>/<repository>`. It checks that the region offers the free database size, creates a storage account for the Terraform state, and creates a managed identity that GitHub Actions can use through OpenID Connect, so no Azure password or key is stored anywhere.
 2. Save the values it prints as GitHub repository secrets.
+3. Run the "Deploy to Azure" workflow once with `apply`. The first run stops after pushing the image, because GitHub makes new packages private: make the package public (your profile, Packages, applytrack, Package settings, Change visibility) and run it again.
 
-Then start the "Deploy to Azure" workflow by hand with `apply`: it builds and pushes the image, runs `terraform apply` and smoke tests the app. The same workflow with `destroy`, or `scripts/teardown.sh` from a laptop, deletes everything again.
+From then on, `apply` builds and pushes the image, runs `terraform apply` and smoke tests the app. `destroy` (or `scripts/teardown.sh` on a laptop, with `TF_STATE_RESOURCE_GROUP`, `TF_STATE_STORAGE_ACCOUNT` and `TF_VAR_subscription_id` set) deletes everything Terraform created. The bootstrap resources stay until `az group delete --name applytrack-tfstate-rg`.
 
 ## Using the API
 
