@@ -1,0 +1,13 @@
+# Apply with: kubectl apply -k k8s/
+# The applytrack-db Secret must exist first (see secret.template.yaml).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: applytrack
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - app.yaml
+images:
+  - name: applytrack
+    newTag: ci

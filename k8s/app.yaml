@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: applytrack
+  labels:
+    app: applytrack
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: applytrack
+  template:
+    metadata:
+      labels:
+        app: applytrack
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: applytrack
+          image: applytrack
+          # The image is built and loaded into kind, not pulled from a registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: applytrack-config
+            - secretRef:
+                name: applytrack-db
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              memory: 768Mi
+          # Startup: give the JVM and Flyway up to 2 minutes before the other probes start counting.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          # Liveness: is the process healthy? Failing restarts the container. No database check here.
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # Readiness: can it serve requests, database included? Failing removes the pod from the Service.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: applytrack
+spec:
+  selector:
+    app: applytrack
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

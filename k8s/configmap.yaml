@@ -1,0 +1,7 @@
+# Settings that are not secret. The app reads them as environment variables.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: applytrack-config
+data:
+  DB_URL: jdbc:postgresql://db:5432/applytrack
