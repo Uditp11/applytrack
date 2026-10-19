@@ -29,7 +29,10 @@ jobs:
           fi
 
       - name: Build Docker image
-        run: docker build -t applytrack:ci .
+        run: |
+          docker build -t applytrack:ci .
+          # Recorded for the results section of the README.
+          docker image ls applytrack:ci --format "Image size: {{.Size}}"
 
       - name: Run the image with PostgreSQL and check health
         run: |
@@ -45,6 +48,7 @@ jobs:
           for i in $(seq 1 30); do
             if curl -fs http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
               echo "Health is UP"
+              docker logs applytrack 2>&1 | grep "Started ApplyTrackApplication" || true
               exit 0
             fi
             sleep 2
