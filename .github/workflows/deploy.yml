@@ -1,0 +1,77 @@
+# Deploys ApplyTrack to Azure, or removes it again. Runs only when started by hand (Actions tab, "Deploy to Azure").
+# Needs the repository secrets printed by scripts/azure-bootstrap.sh. Login uses OpenID Connect: GitHub proves who
+# is asking, Azure trusts this repository's main branch, and no Azure password or key is stored anywhere.
+name: Deploy to Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "apply = deploy or update, destroy = delete everything"
+        required: true
+        type: choice
+        options: [apply, destroy]
+
+permissions:
+  contents: read
+  id-token: write   # for the OpenID Connect login to Azure
+  packages: write   # to push the image to GitHub Container Registry
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  TF_STATE_RESOURCE_GROUP: ${{ secrets.TF_STATE_RESOURCE_GROUP }}
+  TF_STATE_STORAGE_ACCOUNT: ${{ secrets.TF_STATE_STORAGE_ACCOUNT }}
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+
+      - name: Build and push the image
+        if: inputs.action == 'apply'
+        run: |
+          image="ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]'):$GITHUB_SHA"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build -t "$image" .
+          docker push "$image"
+          echo "TF_VAR_image=$image" >> "$GITHUB_ENV"
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        working-directory: terraform
+        env:
+          TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=$TF_STATE_RESOURCE_GROUP" \
+            -backend-config="storage_account_name=$TF_STATE_STORAGE_ACCOUNT" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=applytrack.tfstate" \
+            -backend-config="use_azuread_auth=true"
+          # Budgets must start on the first day of a month that is not in the past.
+          export TF_VAR_budget_start_date="$(date -u +%Y-%m-01T00:00:00Z)"
+          terraform apply -auto-approve -input=false
+          echo "APP_URL=$(terraform output -raw app_url)" >> "$GITHUB_ENV"
+
+      - name: Smoke test the deployed app
+        if: inputs.action == 'apply'
+        run: scripts/smoke.sh
+
+      - name: Destroy everything
+        if: inputs.action == 'destroy'
+        run: scripts/teardown.sh
