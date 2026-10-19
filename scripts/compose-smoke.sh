@@ -1,49 +1,18 @@
 #!/usr/bin/env bash
-# Smoke test for the running stack (docker compose up): the API works, Prometheus scrapes the
-# status change counter, and Grafana has its datasource and dashboard.
+# Smoke test for the docker compose stack: the API checks from smoke.sh, then Prometheus has scraped
+# the status change counter and Grafana has its datasource and dashboard.
 # Usage: scripts/compose-smoke.sh   (override APP_URL, PROMETHEUS_URL, GRAFANA_URL if needed)
 set -euo pipefail
 
-APP_URL=${APP_URL:-http://localhost:8080}
+export APP_URL=${APP_URL:-http://localhost:8080}
 PROMETHEUS_URL=${PROMETHEUS_URL:-http://localhost:9090}
 GRAFANA_URL=${GRAFANA_URL:-http://localhost:3000}
 GRAFANA_AUTH="admin:${GRAFANA_ADMIN_PASSWORD:-admin}"
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
+"$(dirname "$0")/smoke.sh"
 
-# fetch_contains <pattern> <curl arguments...>: true if the response body matches the pattern.
-# The body goes into a variable first: piping curl into "grep -q" can fail when grep stops reading early.
-fetch_contains() {
-  local pattern=$1 body; shift
-  body=$(curl -fsS "$@") || return 1
-  grep -q "$pattern" <<<"$body"
-}
-
-# wait_for <description> <seconds> <command...>: retries the command once per second.
-wait_for() {
-  local what=$1 seconds=$2; shift 2
-  for _ in $(seq 1 "$seconds"); do
-    if "$@" >/dev/null 2>&1; then echo "ok: $what"; return 0; fi
-    sleep 1
-  done
-  fail "$what (gave up after ${seconds}s)"
-}
-
-post() { curl -fsS -H 'Content-Type: application/json' -d "$2" "$APP_URL$1"; }
-id_of() { sed -E 's/^\{"id":([0-9]+).*/\1/'; }
-
-wait_for "app health is UP" 90 fetch_contains '"status":"UP"' "$APP_URL/actuator/health"
-
-# Fictional sample data. The name carries the time so the script can run more than once.
-company=$(post /api/companies "{\"name\":\"Smoke Test Logistics $(date +%s)\"}" | id_of)
-posting=$(post /api/postings "{\"companyId\":$company,\"title\":\"Site Reliability Engineer\"}" | id_of)
-application=$(post /api/applications "{\"postingId\":$posting}" | id_of)
-post "/api/applications/$application/transitions" '{"status":"APPLIED"}' >/dev/null
-post "/api/applications/$application/transitions" '{"status":"INTERVIEW"}' >/dev/null
-echo "ok: created application $application and moved it to INTERVIEW"
-
-fetch_contains '"responded":[1-9]' "$APP_URL/api/stats" || fail "stats do not count the response"
-echo "ok: /api/stats counts the response"
+# shellcheck source=lib.sh
+source "$(dirname "$0")/lib.sh"
 
 # Prometheus scrapes every 15 seconds, so give it time. Every counter exists at 0 from startup, so ask for > 0.
 wait_for "Prometheus has scraped the INTERVIEW move" 90 fetch_contains '"to":"INTERVIEW"' \
@@ -58,4 +27,4 @@ fetch_contains '"title":"ApplyTrack"' -u "$GRAFANA_AUTH" "$GRAFANA_URL/api/dashb
   || fail "Grafana has no provisioned ApplyTrack dashboard"
 echo "ok: Grafana dashboard provisioned"
 
-echo "Smoke test passed"
+echo "Compose smoke test passed"
