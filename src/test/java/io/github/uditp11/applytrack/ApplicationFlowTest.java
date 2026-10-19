@@ -15,9 +15,14 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.fasterxml.jackson.databind.JsonNode;
+
+import io.github.uditp11.applytrack.domain.ApplicationStatus;
+import io.github.uditp11.applytrack.service.ApplicationService;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /** The whole stack: real HTTP, real Spring, real PostgreSQL with the Flyway schema. */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
@@ -28,6 +33,15 @@ class ApplicationFlowTest {
 
     @Autowired
     private TestRestTemplate http;
+
+    @Autowired
+    private ApplicationService applications;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Autowired
+    private MeterRegistry meters;
 
     private JsonNode post(String path, Map<String, ?> body, HttpStatus expected) {
         ResponseEntity<JsonNode> response = http.postForEntity(path, body, JsonNode.class);
@@ -92,5 +106,30 @@ class ApplicationFlowTest {
         assertThat(deleteCompany.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(http.getForEntity("/api/companies/" + companyId, JsonNode.class).getStatusCode())
                 .isEqualTo(HttpStatus.OK);
+    }
+
+    private double movesCounted(String from, String to) {
+        return meters.get("applytrack.status.transitions").tag("from", from).tag("to", to).counter().count();
+    }
+
+    @Test
+    void onlyCommittedMovesAreCounted() {
+        long companyId = post("/api/companies", Map.of("name", "Adventure Works Cycles"), HttpStatus.CREATED)
+                .get("id").asLong();
+        long postingId = post("/api/postings", Map.of("companyId", companyId, "title", "QA Engineer"),
+                HttpStatus.CREATED).get("id").asLong();
+        long id = post("/api/applications", Map.of("postingId", postingId), HttpStatus.CREATED).get("id").asLong();
+        double before = movesCounted("DRAFT", "APPLIED");
+
+        // The move runs inside an outer transaction that is then rolled back, as if the commit had failed.
+        transactions.executeWithoutResult(status -> {
+            applications.moveTo(id, ApplicationStatus.APPLIED);
+            status.setRollbackOnly();
+        });
+        assertThat(applications.get(id).status()).isEqualTo(ApplicationStatus.DRAFT);
+        assertThat(movesCounted("DRAFT", "APPLIED")).isEqualTo(before);
+
+        applications.moveTo(id, ApplicationStatus.APPLIED);
+        assertThat(movesCounted("DRAFT", "APPLIED")).isEqualTo(before + 1);
     }
 }
