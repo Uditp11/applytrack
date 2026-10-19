@@ -25,7 +25,7 @@ flowchart LR
   tf[Terraform] --> azure[Azure deployment]
 ```
 
-The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind, terraform) exist today. The Terraform for Azure was applied once and destroyed again; the deploy workflow can bring the stack back at any time.
+The service, PostgreSQL, Prometheus, Grafana, the Docker image, the Kubernetes manifests and the CI jobs (build, compose, kind, terraform) exist today. The Terraform for Azure was applied once and destroyed again; the setup script and the deploy workflow can bring the stack back at any time.
 
 Code layout under `src/main/java/io/github/uditp11/applytrack`:
 
@@ -133,6 +133,7 @@ The stack was deployed once with the workflow on 2026-10-19 and removed again th
 - Removal: run 39242851755 deleted the app, the database and the budget, then stopped on an Azure provider error while waiting for the Container Apps environment to be deleted; run 39243943257 finished the job, `Destroy complete! Resources: 1 destroyed.`
 - Azure for Students only allows a few regions, so the setup script checks the region and the default is France Central.
 - GitHub's login token now names the repository with its account and repository numbers, so Azure trusts both that form and the plain owner/repository name.
+- Afterwards the one-time setup (the Terraform state storage and the deploy identity) was deleted as well, so nothing is left in Azure. A new deploy starts again at step 1 below; the setup script then prints a new `AZURE_CLIENT_ID` for the GitHub secret.
 
 To deploy, once:
 
