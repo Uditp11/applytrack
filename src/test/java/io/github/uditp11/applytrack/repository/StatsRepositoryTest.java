@@ -10,12 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.util.Map;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import io.github.uditp11.applytrack.TestcontainersConfiguration;
@@ -24,9 +26,9 @@ import io.github.uditp11.applytrack.domain.ApplicationStatus;
 import io.github.uditp11.applytrack.domain.Company;
 import io.github.uditp11.applytrack.domain.Posting;
 import io.github.uditp11.applytrack.domain.StatusTransition;
-import io.github.uditp11.applytrack.repository.StatsRepository.ResponseCounts;
+import io.github.uditp11.applytrack.repository.StatsRepository.ResponseStats;
 
-/** The statistics SQL against real PostgreSQL. Each test rolls back, so it only sees its own rows. */
+/** The statistics SQL against real PostgreSQL. */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({TestcontainersConfiguration.class, StatsRepository.class})
@@ -37,6 +39,7 @@ class StatsRepositoryTest {
 
     @Autowired TestEntityManager entityManager;
     @Autowired StatsRepository stats;
+    @Autowired JdbcClient jdbc;
 
     private int postingCounter;
 
@@ -55,41 +58,43 @@ class StatsRepositoryTest {
     }
 
     /*
-     * The statistics cover the whole table, and other test classes may have committed rows before this one
-     * runs. So each test measures before and after adding its own applications and checks the difference.
+     * The statistics cover whole tables, and other test classes may have committed rows. Each test starts by
+     * deleting everything inside its own transaction; the rollback at the end of the test puts it all back.
      */
-
-    private long added(Map<ApplicationStatus, Long> before, Map<ApplicationStatus, Long> after,
-            ApplicationStatus status) {
-        return after.getOrDefault(status, 0L) - before.getOrDefault(status, 0L);
+    @BeforeEach
+    void startFromEmptyTables() {
+        jdbc.sql("delete from follow_up").update();
+        jdbc.sql("delete from status_transition").update();
+        jdbc.sql("delete from application").update();
+        jdbc.sql("delete from contact").update();
+        jdbc.sql("delete from posting").update();
+        jdbc.sql("delete from company").update();
     }
 
     @Test
     void countsApplicationsByTheirCurrentStatus() {
-        Map<ApplicationStatus, Long> before = stats.countByStatus();
-
         applicationThrough(DRAFT);
         applicationThrough(DRAFT, APPLIED);
         applicationThrough(DRAFT, APPLIED, INTERVIEW, REJECTED);
-        Map<ApplicationStatus, Long> after = stats.countByStatus();
 
-        assertThat(added(before, after, DRAFT)).isEqualTo(1);
-        assertThat(added(before, after, APPLIED)).isEqualTo(1);
-        assertThat(added(before, after, REJECTED)).isEqualTo(1);
-        assertThat(added(before, after, INTERVIEW)).isZero();
+        assertThat(stats.countByStatus())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(DRAFT, 1L, APPLIED, 1L, REJECTED, 1L));
     }
 
     @Test
-    void respondedCountsEveryApplicationThatEverReachedInterviewOrOffer() {
-        ResponseCounts before = stats.responseCounts();
-
+    void theResponseRateCountsEveryApplicationThatEverReachedInterviewOrOffer() {
         applicationThrough(DRAFT);                                 // never applied: not counted at all
         applicationThrough(DRAFT, APPLIED);                        // applied, no response
         applicationThrough(DRAFT, APPLIED, INTERVIEW, REJECTED);   // responded, even though rejected later
         applicationThrough(DRAFT, APPLIED, INTERVIEW, OFFER);      // responded
-        ResponseCounts after = stats.responseCounts();
 
-        assertThat(after.applied() - before.applied()).isEqualTo(3);
-        assertThat(after.responded() - before.responded()).isEqualTo(2);
+        assertThat(stats.responseStats()).isEqualTo(new ResponseStats(3, 2, 0.6667));
+    }
+
+    @Test
+    void theResponseRateIsNullWhileNothingWasApplied() {
+        applicationThrough(DRAFT);
+
+        assertThat(stats.responseStats()).isEqualTo(new ResponseStats(0, 0, null));
     }
 }

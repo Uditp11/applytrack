@@ -1,5 +1,6 @@
 package io.github.uditp11.applytrack.repository;
 
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -12,7 +13,8 @@ import io.github.uditp11.applytrack.domain.ApplicationStatus;
 @Repository
 public class StatsRepository {
 
-    public record ResponseCounts(long applied, long responded) {
+    /** {@code rate} is null while nothing has been applied. */
+    public record ResponseStats(long applied, long responded, Double rate) {
     }
 
     private final JdbcClient jdbc;
@@ -33,21 +35,32 @@ public class StatsRepository {
 
     /**
      * One row per application from its transition history (did it ever reach APPLIED? INTERVIEW or OFFER?),
-     * then counted. History, not current status, so an application rejected after an interview still counts.
+     * then counted, then divided. History, not current status, so an application rejected after an
+     * interview still counts. {@code nullif} turns "nothing applied" into a null rate instead of a division
+     * by zero.
      */
-    public ResponseCounts responseCounts() {
+    public ResponseStats responseStats() {
         return jdbc.sql("""
-                select count(*) filter (where reached_applied)                     as applied,
-                       count(*) filter (where reached_applied and reached_response) as responded
+                select applied,
+                       responded,
+                       round(responded::numeric / nullif(applied, 0), 4) as response_rate
                 from (
-                    select application_id,
-                           bool_or(to_status = 'APPLIED')                as reached_applied,
-                           bool_or(to_status in ('INTERVIEW', 'OFFER'))  as reached_response
-                    from status_transition
-                    group by application_id
-                ) as history
+                    select count(*) filter (where reached_applied)                     as applied,
+                           count(*) filter (where reached_applied and reached_response) as responded
+                    from (
+                        select application_id,
+                               bool_or(to_status = 'APPLIED')               as reached_applied,
+                               bool_or(to_status in ('INTERVIEW', 'OFFER')) as reached_response
+                        from status_transition
+                        group by application_id
+                    ) as history
+                ) as counts
                 """)
-                .query((row, rowNumber) -> new ResponseCounts(row.getLong("applied"), row.getLong("responded")))
+                .query((row, rowNumber) -> {
+                    BigDecimal rate = row.getBigDecimal("response_rate");
+                    return new ResponseStats(row.getLong("applied"), row.getLong("responded"),
+                            rate == null ? null : rate.doubleValue());
+                })
                 .single();
     }
 }

@@ -1,7 +1,5 @@
 package io.github.uditp11.applytrack.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -12,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import io.github.uditp11.applytrack.domain.ApplicationStatus;
 import io.github.uditp11.applytrack.dto.StatsResponse;
 import io.github.uditp11.applytrack.repository.StatsRepository;
-import io.github.uditp11.applytrack.repository.StatsRepository.ResponseCounts;
+import io.github.uditp11.applytrack.repository.StatsRepository.ResponseStats;
 
 @Service
 public class StatsService {
@@ -33,11 +31,7 @@ public class StatsService {
         }
         long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
 
-        ResponseCounts counts = repository.responseCounts();
-        Double rate = counts.applied() == 0 ? null
-                : BigDecimal.valueOf(counts.responded())
-                        .divide(BigDecimal.valueOf(counts.applied()), 4, RoundingMode.HALF_UP)
-                        .doubleValue();
-        return new StatsResponse(total, byStatus, counts.applied(), counts.responded(), rate);
+        ResponseStats response = repository.responseStats();
+        return new StatsResponse(total, byStatus, response.applied(), response.responded(), response.rate());
     }
 }

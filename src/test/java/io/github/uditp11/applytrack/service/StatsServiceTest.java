@@ -14,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import io.github.uditp11.applytrack.domain.ApplicationStatus;
 import io.github.uditp11.applytrack.dto.StatsResponse;
 import io.github.uditp11.applytrack.repository.StatsRepository;
-import io.github.uditp11.applytrack.repository.StatsRepository.ResponseCounts;
+import io.github.uditp11.applytrack.repository.StatsRepository.ResponseStats;
 
 @ExtendWith(MockitoExtension.class)
 class StatsServiceTest {
@@ -28,7 +28,7 @@ class StatsServiceTest {
     @Test
     void withNoApplicationsEverythingIsZeroAndTheRateIsUnknown() {
         when(repository.countByStatus()).thenReturn(Map.of());
-        when(repository.responseCounts()).thenReturn(new ResponseCounts(0, 0));
+        when(repository.responseStats()).thenReturn(new ResponseStats(0, 0, null));
 
         StatsResponse stats = service.stats();
 
@@ -39,20 +39,23 @@ class StatsServiceTest {
 
     @Test
     void missingStatusesAreFilledWithZeroInLifecycleOrder() {
-        when(repository.countByStatus()).thenReturn(Map.of(ApplicationStatus.APPLIED, 2L, ApplicationStatus.OFFER, 1L));
-        when(repository.responseCounts()).thenReturn(new ResponseCounts(3, 1));
+        when(repository.countByStatus())
+                .thenReturn(Map.of(ApplicationStatus.APPLIED, 2L, ApplicationStatus.OFFER, 1L));
+        when(repository.responseStats()).thenReturn(new ResponseStats(3, 1, 0.3333));
 
         StatsResponse stats = service.stats();
 
         assertThat(stats.total()).isEqualTo(3);
         assertThat(stats.byStatus().keySet()).containsExactly(ApplicationStatus.values());
-        assertThat(stats.byStatus()).containsEntry(ApplicationStatus.DRAFT, 0L).containsEntry(ApplicationStatus.APPLIED, 2L);
+        assertThat(stats.byStatus())
+                .containsEntry(ApplicationStatus.DRAFT, 0L)
+                .containsEntry(ApplicationStatus.APPLIED, 2L);
     }
 
     @Test
-    void theResponseRateIsRespondedOverAppliedRoundedToFourDecimals() {
+    void theCountsAndTheRateComeFromTheDatabaseUnchanged() {
         when(repository.countByStatus()).thenReturn(Map.of());
-        when(repository.responseCounts()).thenReturn(new ResponseCounts(3, 2));
+        when(repository.responseStats()).thenReturn(new ResponseStats(3, 2, 0.6667));
 
         StatsResponse stats = service.stats();
 
